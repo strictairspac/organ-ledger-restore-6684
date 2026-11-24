@@ -2,6 +2,7 @@ from time import time
 
 from fastapi import HTTPException
 from sqlalchemy import insert, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.constants.job_state import JobState
 from src.domain.scenario import CONFIG
@@ -26,12 +27,27 @@ def list_entries(db):
 
 
 def enqueue(db, case_id, parameter, actor):
+    """同一资料与同一参数的重跑复用既有批次，绝不新增重复结果。"""
     if parameter > CONFIG["max_parameter"]:
         raise HTTPException(422, f"参数不能超过 {CONFIG['max_parameter']}")
+    if parameter < 1:
+        raise HTTPException(422, "参数至少为 1")
     case_service.get(db, case_id)
-    change = db.execute(insert(runs).values(
-        case_id=case_id, status=JobState.QUEUED, parameter=parameter, actor=actor, created_at=int(time())
-    ))
-    run_id = change.inserted_primary_key[0]
+    statement = (
+        pg_insert(runs)
+        .values(
+            case_id=case_id, status=JobState.QUEUED, parameter=parameter,
+            actor=actor, created_at=int(time()),
+        )
+        .on_conflict_do_nothing(index_elements=["case_id", "parameter"])
+        .returning(runs.c.id)
+    )
+    run_id = db.execute(statement).scalar_one_or_none()
+    if run_id is None:
+        # 已有同资料同参数批次：直接返回既有批次，保持结果唯一。
+        existing = db.execute(
+            query().where(runs.c.case_id == case_id, runs.c.parameter == parameter)
+        ).mappings().one()
+        return dict(existing)
     audit.record(db, "enqueue", actor, "run", run_id)
     return get(db, run_id)

@@ -21,14 +21,15 @@ function signature(review) {
 
 export async function evidencePage(config, user, route) {
   const runs = (await api.runs()).filter(item => item.status === "done");
-  const run = route.id ? await api.run(route.id) : runs[0];
+  const run = route.id ? await api.run(route.id) : runs.find(item => item.result?.outcome === "restored");
   if (!run?.result) return el("div", {class: "page"},
     pageHeading(config.modules[3], null), empty("成功执行一个批次后可以查看、签核和下载证据。"),
     el("a", {href: "#runs"}, config.modules[2]));
 
   const review = await api.review(run.id);
   const issue = errorText();
-  const button = el("button", {type: "button", onclick: async () => {
+  const blocked = run.result.outcome === "blocked";
+  const button = blocked ? null : el("button", {type: "button", onclick: async () => {
     button.disabled = true;
     issue.textContent = "";
     try {
@@ -45,10 +46,12 @@ export async function evidencePage(config, user, route) {
   const options = el("select", {"aria-label": "选择已完成的批次", onchange: event => {
     location.hash = `evidence/${event.target.value}`;
   }}, runs.map(item => el("option", {value: item.id, selected: item.id === run.id}, `#${item.id} ${item.case_title}`)));
+  const verdict = blocked ? el("p", {role: "alert", class: "blocked-notice"},
+    "归档段存在传输损伤，整批已阻断；目标表未写入任何数据，以下仅保留受损段证据，不提供交接导出。") : null;
   return el("div", {class: "page evidence"},
     pageHeading(config.modules[3], run.case_title, button),
     issue, options,
-    el("section", {class: "feature evidence-summary"}, el("div", {}, el("h2", {}, "批次判定"), el("p", {}, run.result.summary)),
+    el("section", {class: "feature evidence-summary"}, el("div", {}, el("h2", {}, "批次判定"), verdict, el("p", {}, run.result.summary)),
       el("details", {}, el("summary", {}, "证据摘要"), el("code", {}, run.digest))),
     el("dl", {class: "metrics"}, Object.entries(run.result.metrics).map(([label, value]) =>
       el("div", {}, el("dt", {}, label), el("dd", {}, cell(value))))),

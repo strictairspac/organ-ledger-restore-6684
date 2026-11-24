@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from migrations.v001_workbench import upgrade
+from migrations import v001_workbench, v002_idempotent_runs
 from src.config.resources import engine
 from src.config.settings import DEMO_PASSWORD
 from src.constants.roles import Role
@@ -21,9 +21,16 @@ def insert_new(db, table, key, values):
     db.execute(stmt)
 
 
-def setup_schema():
-    with engine.begin() as db:
-        upgrade(db)
+def setup_schema(db=None):
+    def migrate(connection):
+        v001_workbench.upgrade(connection)
+        v002_idempotent_runs.upgrade(connection)
+
+    if db is not None:
+        migrate(db)
+        return
+    with engine.begin() as connection:
+        migrate(connection)
 
 
 def seed():

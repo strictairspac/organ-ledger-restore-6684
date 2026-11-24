@@ -1,5 +1,7 @@
+import csv
 from dataclasses import dataclass, replace
 from hashlib import sha256
+from io import StringIO
 
 from .relations import RELATIONS, select_sql
 
@@ -14,8 +16,17 @@ class Segment:
     def capture(cls, relation, data):
         return cls(relation, data, sha256(data).hexdigest())
 
+    def actual_digest(self):
+        return sha256(self.data).hexdigest()
+
     def verified(self):
-        return sha256(self.data).hexdigest() == self.digest
+        return self.actual_digest() == self.digest
+
+    def record_count(self):
+        text_data = self.data.decode("utf-8")
+        if not text_data:
+            return 0
+        return sum(1 for _ in csv.reader(StringIO(text_data)))
 
 
 def export_selection(db, source, requested):

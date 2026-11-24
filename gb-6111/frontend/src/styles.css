@@ -96,6 +96,7 @@ td a[aria-current=true] { font-weight: 750; }
 .metrics div { border-top: .2rem solid var(--accent); background: var(--surface); padding: .78rem; min-width: 0; }
 .metrics dd { color: var(--accent); font: 700 1.55rem/1.25 var(--title-font); overflow-wrap: anywhere; }
 .evidence select { width: fit-content; max-width: 100%; }
+.blocked-notice { border-left: .2rem solid #b3261e; background: var(--tint); padding: .6rem .8rem; font-weight: 700; }
 .signature { border-left: .2rem solid var(--accent); padding-left: .85rem; }
 .signature p { margin: .35rem 0; overflow-wrap: anywhere; }
 @media (max-width: 1050px) {

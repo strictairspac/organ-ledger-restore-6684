@@ -7,9 +7,13 @@ import { el } from "../utils/dom.js";
 import { time } from "../utils/format.js";
 
 function reportState(run) {
+  const restored = run.status === "done" && run.result?.outcome === "restored";
+  const blocked = run.status === "done" && run.result?.outcome === "blocked";
+  const followup = restored ? el("a", {class: "button", href: `#evidence/${run.id}`}, "查看业务证据")
+    : blocked ? el("a", {class: "button", href: `#evidence/${run.id}`}, "查看阻断证据") : null;
   return el("div", {class: "stack", id: "run-state"}, status(run.status),
     el("p", {}, run.status === "queued" ? "后台正在处理，页面会自动更新。" : run.failure || run.result?.summary),
-    run.status === "done" ? el("a", {class: "button", href: `#evidence/${run.id}`}, "查看业务证据") : null);
+    followup);
 }
 
 export async function runsPage(config, route, signal) {

@@ -4,6 +4,7 @@ from src.config.resources import engine
 from src.constants.job_state import JobState
 from src.controllers.access import identity, reviewer
 from src.controllers.workbench import new_review
+from src.domain.scenario import OUTCOME_RESTORED
 from src.schemas.reviews import ReviewEntry, ReviewInput
 from src.schemas.runs import RunEntry
 from src.services import reviews, runs
@@ -42,6 +43,8 @@ def export(run_id: int):
         run = runs.get(db, run_id)
         if run["status"] != JobState.DONE:
             raise HTTPException(409, "没有可导出的执行结果")
+        if not run["result"] or run["result"].get("outcome") != OUTCOME_RESTORED:
+            raise HTTPException(409, "批次已阻断复原，仅保留阻断证据，不提供交接导出")
         run["review"] = reviews.get(db, run_id)
     return Response(canonical_json(run), media_type="application/json", headers={
         "Content-Disposition": f"attachment; filename=evidence-{run_id}.json",

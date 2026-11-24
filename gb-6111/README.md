@@ -15,7 +15,9 @@ PostgreSQL 原生 COPY、外键依赖闭包和逐段 SHA-256 字节核验。
 
 09:00 打开 organ-ledger-2026-11.copy 对应的十一月维修卷。09:05 选 W-1131、W-1138。09:07 设置最多 20 张。09:10 提交演练。09:12 核对 2 个琴体、2 张工单、3 条测记。09:15 复核三个 COPY 摘要后导出证明。09:20 用损伤卷重跑，确认只输出阻断证据。
 
-先按请求顺序取上限内的工单，把父琴体与其所有子测记一并选中。PostgreSQL COPY 以主键 C 排序流出 UTF-8 CSV，每段计算 SHA-256。全部段校验通过后才按外键顺序还原。校验报告重新导出目标表并对照原始段摘要。
+先按请求顺序取上限内的工单，把父琴体与其所有子测记一并选中。PostgreSQL COPY 以主键 C 排序流出 UTF-8 CSV，每段计算 SHA-256。**全部段核验通过后才一次性创建目标表并按外键顺序还原；任一段损坏即整批阻断，目标表不创建、不写入，并逐段保留证明摘要与传输后实测摘要。** 校验报告重新导出目标表，逐段核对证明摘要、重新导出摘要与还原行数，三者一致才判定成功。
+
+同一资料与同一参数只对应一个执行批次（`runs(case_id, parameter)` 唯一约束）：重跑返回既有批次，不新增重复结果。成功结果只包含选中工单及其父琴体、子测记，不含未选工单或源卷总行数；阻断批次仅保留阻断证据，不提供交接导出。
 
 范围为应用演练中的逻辑数据卷。以数据库隔离临时表核验，数据库事务结束后自动清除，不提供整库 DDL、角色、物理 WAL 或生产恢复编排。
 
@@ -61,5 +63,15 @@ docker compose up -d --build --wait
 ## 验收范围
 
 COPY 使用隔离临时表和应用层归档卷。覆盖数据恢复与依赖核验，整库 DDL、角色和 WAL 在范围之外。 当前界面用 JSON 编辑业务资料，以 JSON 下载证据。过程和截图保存在批次的 [验收记录](../../test-artifacts/gb-6111/TESTING.md)。
+
+## 后端测试
+
+`backend/tests` 用 pytest 覆盖重跑幂等、整批阻断留证、选中闭包与摘要/行数一致性，需要一个可连通的 PostgreSQL：
+
+```sh
+pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+DATABASE_URL=postgresql+psycopg://workbench@127.0.0.1:17812/workbench \
+JWT_SECRET=test DEMO_PASSWORD=test python -m pytest backend/tests
+```
 
 [MIT License](LICENSE)
